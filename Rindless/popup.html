@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rindless</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body class="loading">
+    <header class="header">
+      <span class="logo" aria-hidden="true">🍈</span>
+      <h1 class="title">Rindless</h1>
+    </header>
+
+    <main class="toggles" id="toggles" hidden>
+      <div class="toggle-row">
+        <label for="hideAI">Hide Google AI Results</label>
+        <input type="checkbox" id="hideAI" class="toggle-input" role="switch" />
+        <label for="hideAI" class="toggle-switch" aria-hidden="true"></label>
+      </div>
+
+      <div class="toggle-row">
+        <label for="rejectCookies">Auto-Reject Cookies</label>
+        <input type="checkbox" id="rejectCookies" class="toggle-input" role="switch" />
+        <label for="rejectCookies" class="toggle-switch" aria-hidden="true"></label>
+      </div>
+
+      <div class="toggle-row">
+        <label for="adblock">Ad Blocker</label>
+        <input type="checkbox" id="adblock" class="toggle-input" role="switch" />
+        <label for="adblock" class="toggle-switch" aria-hidden="true"></label>
+      </div>
+    </main>
+
+    <p class="note">Reload the page to apply ad blocker changes.</p>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
