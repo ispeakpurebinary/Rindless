@@ -40,127 +40,101 @@ chrome.storage.sync.get(DEFAULT_SETTINGS, (settings) => {
 // Feature 1: Hide Google AI Results
 // ---------------------------------------------------------------------------
 
-/** Match google.com and country domains (google.co.uk, google.de, etc.) */
+/** Google search results only, top frame only (avoids work in every iframe) */
 function isGoogleSearchPage() {
+  if (window !== window.top) {
+    return false;
+  }
   const host = location.hostname;
-  return (
+  const isGoogleHost =
     host === "google.com" ||
     host.endsWith(".google.com") ||
     host.startsWith("google.") ||
-    /\.google\.[a-z.]+$/.test(host)
-  );
+    /\.google\.[a-z.]+$/.test(host);
+  return isGoogleHost && location.pathname.startsWith("/search");
 }
 
-// Selector battery — Google rotates these frequently; keep many fallbacks
-const AI_OVERVIEW_SELECTORS = [
-  'div[aria-label="AI Overview"]',
-  'div[data-attrid="AIOverview"]',
-  'div[data-attrid="overview"]',
-  'div[data-async-type="aiOverview"]',
-  'div[data-async-context*="ai_overview"]',
-  'div[data-rl="ai_overview"]',
-  "div#eKIzJc",
-  "div.YzCcne[data-mcpr]",
-  'div[data-mcp="18"]',
-  '[data-attrid="wa:/description"]',
-  'div[jsname="yEVEwb"]',
-  'div[jsname="tJHJj"]',
-  'div[jsname="N760b"]',
-  ".AIOverview",
-  "#abc_summary",
-  "#m-x-content",
-  ".YzCcne",
-];
+// CSS handles hiding — no repeated DOM walks needed for these selectors
+const AI_HIDE_CSS = `
+  div[aria-label="AI Overview"],
+  div[data-attrid="AIOverview"],
+  div[data-attrid="overview"],
+  div[data-async-type="aiOverview"],
+  div[data-async-context*="ai_overview"],
+  div[data-rl="ai_overview"],
+  div#eKIzJc,
+  div.YzCcne[data-mcpr],
+  div[data-mcp="18"],
+  div[jsname="yEVEwb"],
+  div[jsname="tJHJj"],
+  div[jsname="N760b"],
+  .AIOverview,
+  #abc_summary,
+  #m-x-content,
+  #rso div.ULSxyf:has(a[href*="ai_overviews"]),
+  #rso > div.MjjYud:has(a[href*="ai_overviews"]),
+  #rcnt div[data-hveid] div:has(a[href*="ai_overviews"]),
+  #rcnt div[data-hveid] div:has([data-async-type="folsrch"]) {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+`;
 
-const AI_HIDE_CSS = [
-  ...AI_OVERVIEW_SELECTORS.map(
-    (sel) =>
-      `${sel} { display: none !important; visibility: hidden !important; height: 0 !important; overflow: hidden !important; margin: 0 !important; padding: 0 !important; }`
-  ),
-  '#rso div.ULSxyf:has(a[href*="ai_overviews"])',
-  '#rso > div.MjjYud:has(a[href*="ai_overviews"])',
-  '#rso > div.MjjYud:has(path[d^="M235.5 471"])',
-  '#rcnt div[data-hveid] div:has(a[href*="ai_overviews"])',
-  '#rcnt div[data-hveid] div:has([data-async-type="folsrch"])',
-]
-  .map((rule) => `${rule} { display: none !important; }`)
-  .join("\n");
-
-const AI_CONTAINER_CLOSEST =
-  "div[data-mcpr], div.YzCcne, div#eKIzJc, div.MjjYud, div.ULSxyf, div[data-hveid], div[data-attrid]";
+let aiStylesInjected = false;
+let aiDebounceTimer = null;
+let aiObserver = null;
+let aiObserverDisconnectTimer = null;
+let aiNavHooked = false;
 
 function injectAIHideStyles() {
-  let style = document.getElementById("rindless-ai-hide");
-  if (!style) {
-    style = document.createElement("style");
-    style.id = "rindless-ai-hide";
-    const target = document.head || document.documentElement;
-    if (target) {
-      target.appendChild(style);
-    }
+  if (aiStylesInjected || document.getElementById("rindless-ai-hide")) {
+    aiStylesInjected = true;
+    return;
   }
+  const style = document.createElement("style");
+  style.id = "rindless-ai-hide";
   style.textContent = AI_HIDE_CSS;
+  (document.head || document.documentElement)?.appendChild(style);
+  aiStylesInjected = true;
 }
 
 function removeAIHideStyles() {
   document.getElementById("rindless-ai-hide")?.remove();
+  aiStylesInjected = false;
 }
 
-function hideElement(el) {
-  if (!el || el.dataset.rindlessAiHidden) {
-    return;
-  }
-  el.dataset.rindlessAiHidden = "true";
-  el.style.setProperty("display", "none", "important");
-  el.style.setProperty("visibility", "hidden", "important");
-  el.style.setProperty("height", "0", "important");
-  el.style.setProperty("overflow", "hidden", "important");
-  el.style.setProperty("margin", "0", "important");
-  el.style.setProperty("padding", "0", "important");
-}
-
-function hideByHeadingText() {
-  document.querySelectorAll("h1, h2, h3").forEach((heading) => {
+/** Lightweight DOM fallback for headings/markers CSS cannot catch */
+function hideAIOverviewFallback() {
+  document.querySelectorAll('h1, h2, h3').forEach((heading) => {
     const text = heading.textContent?.trim();
-    if (!text || (!text.startsWith("AI Overview") && text !== "AI Overview")) {
+    if (text !== "AI Overview" && !text?.startsWith("AI Overview")) {
       return;
     }
-    const container =
-      heading.closest(AI_CONTAINER_CLOSEST) ||
-      heading.closest("div")?.parentElement?.closest("div");
-    hideElement(container || heading);
+    const container = heading.closest(
+      "div[data-mcpr], div.YzCcne, div#eKIzJc, div.MjjYud, div.ULSxyf"
+    );
+    if (container) {
+      container.style.setProperty("display", "none", "important");
+    }
   });
 }
 
-function hideByAIOverviewMarker() {
-  document
-    .querySelectorAll('a[href*="ai_overviews"], a[href*="p=ai_overviews"]')
-    .forEach((link) => {
-      const container =
-        link.closest("#rso div.MjjYud, #rso div.ULSxyf, div[data-mcpr], div.YzCcne, div#eKIzJc") ||
-        link.closest("div[data-hveid]")?.parentElement;
-      hideElement(container || link.closest("div"));
-    });
-}
-
-function hideAIOverviewElements() {
-  for (const selector of AI_OVERVIEW_SELECTORS) {
-    try {
-      document.querySelectorAll(selector).forEach(hideElement);
-    } catch (_err) {
-      // skip invalid selector
-    }
-  }
-  hideByHeadingText();
-  hideByAIOverviewMarker();
-}
-
-let aiObserver = null;
-let aiObserverDisconnectTimer = null;
-
 function runAIHidePass() {
   injectAIHideStyles();
-  hideAIOverviewElements();
+  hideAIOverviewFallback();
+}
+
+function scheduleAIHidePass() {
+  clearTimeout(aiDebounceTimer);
+  aiDebounceTimer = setTimeout(runAIHidePass, 300);
+}
+
+function getAISearchRoot() {
+  return document.querySelector("#rcnt") || document.querySelector("#center_col") || document.body;
 }
 
 function startAIHideObserver() {
@@ -171,61 +145,53 @@ function startAIHideObserver() {
 
   runAIHidePass();
 
-  aiObserver = new MutationObserver(() => {
-    try {
-      runAIHidePass();
-    } catch (err) {
-      console.error("[Rindless] AI observer callback error:", err);
+  aiObserver = new MutationObserver((mutations) => {
+    const hasNewNodes = mutations.some((m) =>
+      [...m.addedNodes].some((n) => n.nodeType === Node.ELEMENT_NODE)
+    );
+    if (hasNewNodes) {
+      scheduleAIHidePass();
     }
   });
 
-  const observeTarget = document.documentElement || document.body;
-  if (observeTarget) {
-    aiObserver.observe(observeTarget, { childList: true, subtree: true });
+  const root = getAISearchRoot();
+  if (root) {
+    aiObserver.observe(root, { childList: true, subtree: true });
   }
 
-  // Disconnect after 10 seconds to avoid memory leaks (restarted on SPA navigations)
   aiObserverDisconnectTimer = setTimeout(() => {
     aiObserver?.disconnect();
     aiObserver = null;
   }, 10000);
 }
 
-function scheduleDelayedAIHidePasses() {
-  // AI Overview often loads asynchronously after the initial paint
-  [300, 800, 1500, 3000, 5000, 8000, 12000, 18000].forEach((ms) => {
-    setTimeout(runAIHidePass, ms);
-  });
-}
-
 function watchGoogleSearchNavigation() {
-  let lastUrl = location.href;
+  if (aiNavHooked) {
+    return;
+  }
+  aiNavHooked = true;
 
+  let lastUrl = location.href;
   const onNavigate = () => {
-    if (location.href !== lastUrl) {
+    if (location.href !== lastUrl && isGoogleSearchPage()) {
       lastUrl = location.href;
+      injectAIHideStyles();
       startAIHideObserver();
-      scheduleDelayedAIHidePasses();
+      setTimeout(runAIHidePass, 1000);
+      setTimeout(runAIHidePass, 3000);
     }
   };
 
   window.addEventListener("popstate", onNavigate);
 
-  const wrapHistory = (method) => {
+  for (const method of ["pushState", "replaceState"]) {
     const original = history[method];
     history[method] = function (...args) {
       const result = original.apply(this, args);
       onNavigate();
       return result;
     };
-  };
-
-  wrapHistory("pushState");
-  wrapHistory("replaceState");
-
-  // Lightweight poll catches Google navigations that bypass history hooks
-  const urlPoll = setInterval(onNavigate, 500);
-  setTimeout(() => clearInterval(urlPoll), 120000);
+  }
 }
 
 function initHideGoogleAI() {
@@ -233,22 +199,23 @@ function initHideGoogleAI() {
     return;
   }
 
+  injectAIHideStyles();
   runAIHidePass();
   startAIHideObserver();
-  scheduleDelayedAIHidePasses();
   watchGoogleSearchNavigation();
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", runAIHidePass, { once: true });
-  }
+  // A few timed passes for async AI injection — not a continuous poll
+  setTimeout(runAIHidePass, 1000);
+  setTimeout(runAIHidePass, 3000);
+  setTimeout(runAIHidePass, 6000);
 }
 
-// Inject hide styles as early as possible on Google (before async storage read)
+// Inject CSS immediately on search pages (before async storage read)
 if (isGoogleSearchPage()) {
   try {
     injectAIHideStyles();
   } catch (_err) {
-    // ignore — full init runs after storage resolves
+    // full init runs after storage resolves
   }
 }
 
@@ -351,12 +318,25 @@ function attemptCookieReject() {
 }
 
 function initAutoRejectCookies() {
+  let cookieRejectDone = false;
+  let cookieDebounceTimer = null;
+
   const runReject = () => {
+    if (cookieRejectDone) {
+      return;
+    }
     try {
-      attemptCookieReject();
+      if (attemptCookieReject()) {
+        cookieRejectDone = true;
+      }
     } catch (err) {
       console.error("[Rindless] cookie reject error:", err);
     }
+  };
+
+  const scheduleReject = () => {
+    clearTimeout(cookieDebounceTimer);
+    cookieDebounceTimer = setTimeout(runReject, 300);
   };
 
   if (document.readyState === "loading") {
@@ -365,12 +345,20 @@ function initAutoRejectCookies() {
     runReject();
   }
 
-  // Catch banners that appear after initial load
-  const observer = new MutationObserver(() => {
-    runReject();
+  // Catch banners that appear after initial load (debounced, stops after success)
+  const observer = new MutationObserver((mutations) => {
+    if (cookieRejectDone) {
+      return;
+    }
+    const hasNewNodes = mutations.some((m) =>
+      [...m.addedNodes].some((n) => n.nodeType === Node.ELEMENT_NODE)
+    );
+    if (hasNewNodes) {
+      scheduleReject();
+    }
   });
 
-  const observeTarget = document.documentElement || document.body;
+  const observeTarget = document.body || document.documentElement;
   if (observeTarget) {
     observer.observe(observeTarget, { childList: true, subtree: true });
   }
