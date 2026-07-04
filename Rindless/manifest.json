@@ -1,23 +1,86 @@
 {
   "manifest_version": 3,
   "name": "Rindless",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Hide Google AI results, auto-reject cookie banners, and block ads and trackers.",
-  "permissions": [
-    "storage",
-    "declarativeNetRequest",
-    "declarativeNetRequestWithHostAccess"
-  ],
-  "host_permissions": ["<all_urls>"],
+  "permissions": ["storage", "declarativeNetRequest"],
   "background": {
     "service_worker": "background.js"
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"],
+      "matches": [
+        "*://*.google.com/*",
+        "*://google.com/*",
+        "*://*.google.co.uk/*",
+        "*://*.google.de/*",
+        "*://*.google.fr/*",
+        "*://*.google.ca/*",
+        "*://*.google.com.au/*",
+        "*://*.google.co.in/*",
+        "*://*.google.co.jp/*",
+        "*://*.google.it/*",
+        "*://*.google.es/*",
+        "*://*.google.com.br/*",
+        "*://*.google.com.mx/*",
+        "*://*.google.nl/*",
+        "*://*.google.pl/*",
+        "*://*.google.se/*",
+        "*://*.google.com.tr/*",
+        "*://*.google.co.kr/*",
+        "*://*.google.com.hk/*",
+        "*://*.google.be/*",
+        "*://*.google.at/*",
+        "*://*.google.ch/*",
+        "*://*.google.ie/*",
+        "*://*.google.co.nz/*",
+        "*://*.google.com.sg/*",
+        "*://*.google.com.ar/*",
+        "*://*.google.cl/*",
+        "*://*.google.pt/*",
+        "*://*.google.cz/*",
+        "*://*.google.gr/*",
+        "*://*.google.hu/*",
+        "*://*.google.ro/*",
+        "*://*.google.dk/*",
+        "*://*.google.fi/*",
+        "*://*.google.no/*",
+        "*://*.google.co.za/*",
+        "*://*.google.ae/*",
+        "*://*.google.co.il/*",
+        "*://*.google.ru/*",
+        "*://*.google.com.tw/*",
+        "*://*.google.com.pk/*",
+        "*://*.google.com.ph/*",
+        "*://*.google.com.my/*",
+        "*://*.google.co.id/*",
+        "*://*.google.co.th/*",
+        "*://*.google.com.vn/*",
+        "*://*.google.com.co/*",
+        "*://*.google.com.eg/*",
+        "*://*.google.com.ng/*",
+        "*://*.google.com.sa/*",
+        "*://*.google.com.ua/*"
+      ],
+      "js": ["content-google.js"],
       "run_at": "document_start",
-      "all_frames": true
+      "all_frames": false
+    },
+    {
+      "matches": ["*://*.youtube.com/*", "*://youtube.com/*"],
+      "js": ["content-youtube.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "exclude_matches": [
+        "*://chrome.google.com/*",
+        "*://chromewebstore.google.com/*"
+      ],
+      "js": ["content-cookies.js"],
+      "run_at": "document_idle",
+      "all_frames": false
     }
   ],
   "action": {

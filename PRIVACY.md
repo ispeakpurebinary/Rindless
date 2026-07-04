@@ -34,11 +34,12 @@ The Extension popup loads the "Press Start 2P" font from Google Fonts (`fonts.go
 
 ## Permissions
 
-Rindless requests permissions necessary for its features:
+Rindless requests only the permissions necessary for its features:
 
 - **storage** — save your toggle preferences
-- **declarativeNetRequest / declarativeNetRequestWithHostAccess** — ad and tracker blocking
-- **Host access (`<all_urls>`)** — run content features on pages you visit when toggles are enabled
+- **declarativeNetRequest** — block ad and tracker network requests via bundled rules
+
+Page features (hide AI, cookie reject, YouTube cleanup) run through manifest-declared content scripts scoped to the relevant sites. Rindless does **not** request broad host permissions.
 
 ## Children's Privacy
 
