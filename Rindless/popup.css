@@ -74,7 +74,7 @@ body {
 .pixel-shadow--shell {
   --shadow-x: 10px;
   --shadow-y: 10px;
-  width: 360px;
+  width: 340px;
   display: block;
 }
 
