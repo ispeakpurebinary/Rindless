@@ -3,36 +3,135 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
     <title>Rindless</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: transparent !important;
+      }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body class="loading">
-    <header class="header">
-      <span class="logo" aria-hidden="true">🍈</span>
-      <h1 class="title">Rindless</h1>
-    </header>
+    <div class="pixel-shadow pixel-shadow--shell">
+      <div class="pixel-border pixel-border--shell">
+        <div class="pixel-inner pixel-inner--shell">
+          <header class="header">
+            <div class="pixel-border pixel-border--header">
+              <div class="pixel-inner pixel-inner--header">
+                <div class="header-main">
+                  <img src="logo.png" class="logo" alt="Rindless guava logo" />
+                  <div class="header-text">
+                    <h1 class="title">RINDLESS</h1>
+                  </div>
+                  <div class="health-bars" aria-hidden="true">
+                    <span class="health-bar" id="health-hideAI"></span>
+                    <span class="health-bar" id="health-rejectCookies"></span>
+                    <span class="health-bar" id="health-adblock"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </header>
 
-    <main class="toggles" id="toggles" hidden>
-      <div class="toggle-row">
-        <label for="hideAI">Hide Google AI Results</label>
-        <input type="checkbox" id="hideAI" class="toggle-input" role="switch" />
-        <label for="hideAI" class="toggle-switch" aria-hidden="true"></label>
+          <div class="popup-body">
+            <main class="toggles" id="toggles">
+              <div class="toggle-row-wrap">
+                <div class="pixel-shadow pixel-shadow--row">
+                  <div class="pixel-border pixel-border--row">
+                    <div class="pixel-inner pixel-inner--row">
+                      <div class="toggle-labels">
+                        <label class="toggle-name" for="hideAI">HIDE AI RESULTS</label>
+                        <p class="toggle-desc">NO MORE GOOGLE AI</p>
+                      </div>
+                      <input type="checkbox" id="hideAI" class="toggle-input" role="switch" checked />
+                      <label for="hideAI" class="toggle-switch">
+                        <span class="pixel-shadow pixel-shadow--toggle">
+                          <span class="pixel-border pixel-border--toggle">
+                            <span class="toggle-track pixel-inner pixel-inner--toggle">
+                              <span class="toggle-knob-wrap">
+                                <span class="pixel-border pixel-border--knob">
+                                  <span class="toggle-knob pixel-inner pixel-inner--knob"></span>
+                                </span>
+                              </span>
+                            </span>
+                          </span>
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="toggle-row-wrap">
+                <div class="pixel-shadow pixel-shadow--row">
+                  <div class="pixel-border pixel-border--row">
+                    <div class="pixel-inner pixel-inner--row">
+                      <div class="toggle-labels">
+                        <label class="toggle-name" for="rejectCookies">REJECT COOKIES</label>
+                        <p class="toggle-desc">BANNER BEGONE</p>
+                      </div>
+                      <input type="checkbox" id="rejectCookies" class="toggle-input" role="switch" checked />
+                      <label for="rejectCookies" class="toggle-switch">
+                        <span class="pixel-shadow pixel-shadow--toggle">
+                          <span class="pixel-border pixel-border--toggle">
+                            <span class="toggle-track pixel-inner pixel-inner--toggle">
+                              <span class="toggle-knob-wrap">
+                                <span class="pixel-border pixel-border--knob">
+                                  <span class="toggle-knob pixel-inner pixel-inner--knob"></span>
+                                </span>
+                              </span>
+                            </span>
+                          </span>
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="toggle-row-wrap">
+                <div class="pixel-shadow pixel-shadow--row">
+                  <div class="pixel-border pixel-border--row">
+                    <div class="pixel-inner pixel-inner--row">
+                      <div class="toggle-labels">
+                        <label class="toggle-name" for="adblock">AD BLOCKER</label>
+                        <p class="toggle-desc">BLOCK ALL THE ADS</p>
+                      </div>
+                      <input type="checkbox" id="adblock" class="toggle-input" role="switch" checked />
+                      <label for="adblock" class="toggle-switch">
+                        <span class="pixel-shadow pixel-shadow--toggle">
+                          <span class="pixel-border pixel-border--toggle">
+                            <span class="toggle-track pixel-inner pixel-inner--toggle">
+                              <span class="toggle-knob-wrap">
+                                <span class="pixel-border pixel-border--knob">
+                                  <span class="toggle-knob pixel-inner pixel-inner--knob"></span>
+                                </span>
+                              </span>
+                            </span>
+                          </span>
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </main>
+
+            <p class="footer-note">► RELOAD TO APPLY NETWORK BLOCKS</p>
+          </div>
+        </div>
       </div>
-
-      <div class="toggle-row">
-        <label for="rejectCookies">Auto-Reject Cookies</label>
-        <input type="checkbox" id="rejectCookies" class="toggle-input" role="switch" />
-        <label for="rejectCookies" class="toggle-switch" aria-hidden="true"></label>
-      </div>
-
-      <div class="toggle-row">
-        <label for="adblock">Ad Blocker</label>
-        <input type="checkbox" id="adblock" class="toggle-input" role="switch" />
-        <label for="adblock" class="toggle-switch" aria-hidden="true"></label>
-      </div>
-    </main>
-
-    <p class="note">Reload the page to apply ad blocker changes.</p>
+    </div>
 
     <script src="popup.js"></script>
   </body>

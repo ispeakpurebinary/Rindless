@@ -11,41 +11,75 @@ const rejectCookiesInput = document.getElementById("rejectCookies");
 const adblockInput = document.getElementById("adblock");
 const togglesContainer = document.getElementById("toggles");
 
-/** Map storage keys to checkbox elements */
+/** Map storage keys to checkbox elements and header health bars */
 const TOGGLE_MAP = [
-  { key: "hideAI", input: hideAIInput },
-  { key: "rejectCookies", input: rejectCookiesInput },
-  { key: "adblock", input: adblockInput },
+  { key: "hideAI", input: hideAIInput, health: document.getElementById("health-hideAI") },
+  { key: "rejectCookies", input: rejectCookiesInput, health: document.getElementById("health-rejectCookies") },
+  { key: "adblock", input: adblockInput, health: document.getElementById("health-adblock") },
 ];
 
-// Prevent flicker: keep body.loading until storage is read and checkboxes are set
-document.addEventListener("DOMContentLoaded", () => {
-  chrome.storage.sync.get(DEFAULT_SETTINGS, (settings) => {
-    if (chrome.runtime.lastError) {
-      console.error("[Rindless] popup storage read error:", chrome.runtime.lastError);
-      settings = DEFAULT_SETTINGS;
+function updateHealthBars() {
+  for (const { input, health } of TOGGLE_MAP) {
+    if (!health) {
+      continue;
     }
+    health.classList.toggle("is-on", input.checked);
+    health.classList.toggle("is-off", !input.checked);
+  }
+}
 
-    for (const { key, input } of TOGGLE_MAP) {
+function applySettings(settings) {
+  for (const { key, input } of TOGGLE_MAP) {
+    if (input) {
       input.checked = Boolean(settings[key]);
     }
+  }
+  updateHealthBars();
+  document.body.classList.remove("loading");
+}
 
-    togglesContainer.hidden = false;
-    document.body.classList.remove("loading");
-  });
-});
+function loadSettings() {
+  try {
+    chrome.storage.sync.get(DEFAULT_SETTINGS, (settings) => {
+      if (chrome.runtime.lastError) {
+        console.error("[Rindless] popup storage read error:", chrome.runtime.lastError);
+        applySettings(DEFAULT_SETTINGS);
+        return;
+      }
+      applySettings(settings);
+    });
+  } catch (err) {
+    console.error("[Rindless] popup init error:", err);
+    applySettings(DEFAULT_SETTINGS);
+  }
+}
+
+// Run immediately — DOMContentLoaded can miss in extension popups
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", loadSettings, { once: true });
+} else {
+  loadSettings();
+}
+
+// Fallback if storage never responds
+setTimeout(() => {
+  if (document.body.classList.contains("loading")) {
+    applySettings(DEFAULT_SETTINGS);
+  }
+}, 300);
 
 // Persist each toggle change to chrome.storage.sync
 for (const { key, input } of TOGGLE_MAP) {
   input.addEventListener("change", () => {
     const value = input.checked;
+    updateHealthBars();
+
     chrome.storage.sync.set({ [key]: value }, () => {
       if (chrome.runtime.lastError) {
         console.error("[Rindless] popup storage write error:", chrome.runtime.lastError);
       }
     });
 
-    // Notify background when adblock toggle changes
     if (key === "adblock") {
       chrome.runtime.sendMessage(
         { action: "toggleAdblock", enabled: value },
