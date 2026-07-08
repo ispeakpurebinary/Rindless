@@ -76,10 +76,29 @@
               <div class="toggle-row-wrap">
                 <div class="pixel-shadow pixel-shadow--row">
                   <div class="pixel-border pixel-border--row">
-                    <div class="pixel-inner pixel-inner--row">
+                    <div class="pixel-inner pixel-inner--row pixel-inner--row-paa">
                       <div class="toggle-labels">
-                        <label class="toggle-name" for="hidePeopleAlsoAsk">HIDE PEOPLE ALSO ASK</label>
+                        <div class="toggle-name-row">
+                          <label class="toggle-name" for="hidePeopleAlsoAsk">HIDE PEOPLE ALSO ASK</label>
+                          <button
+                            type="button"
+                            class="info-button"
+                            id="paaInfoButton"
+                            aria-expanded="false"
+                            aria-controls="paaInfoPanel"
+                            aria-label="More information about People also ask"
+                          >
+                            i
+                          </button>
+                        </div>
                         <p class="toggle-desc">PAA OFTEN HAS AI OVERVIEWS</p>
+                        <div class="info-panel" id="paaInfoPanel" hidden>
+                          <p class="info-panel-text">
+                            Google now injects AI Overview as the sole answer inside People Also Ask items.
+                            It has removed most of the older non-AI answers, so Rindless cannot restore them.
+                            If you don't want to see AI-backed answers, you can hide the whole section with this toggle.
+                          </p>
+                        </div>
                       </div>
                       <input type="checkbox" id="hidePeopleAlsoAsk" class="toggle-input" role="switch" />
                       <label for="hidePeopleAlsoAsk" class="toggle-switch">

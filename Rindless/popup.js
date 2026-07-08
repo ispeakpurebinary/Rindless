@@ -12,6 +12,8 @@ const hidePeopleAlsoAskInput = document.getElementById("hidePeopleAlsoAsk");
 const rejectCookiesInput = document.getElementById("rejectCookies");
 const adblockInput = document.getElementById("adblock");
 const togglesContainer = document.getElementById("toggles");
+const paaInfoButton = document.getElementById("paaInfoButton");
+const paaInfoPanel = document.getElementById("paaInfoPanel");
 
 /** Map storage keys to checkbox elements and header health bars */
 const TOGGLE_MAP = [
@@ -74,6 +76,14 @@ setTimeout(() => {
     applySettings(DEFAULT_SETTINGS);
   }
 }, 300);
+
+if (paaInfoButton && paaInfoPanel) {
+  paaInfoButton.addEventListener("click", () => {
+    const expanded = paaInfoButton.getAttribute("aria-expanded") === "true";
+    paaInfoButton.setAttribute("aria-expanded", String(!expanded));
+    paaInfoPanel.hidden = expanded;
+  });
+}
 
 // Persist each toggle change to chrome.storage.sync
 for (const { key, input } of TOGGLE_MAP) {

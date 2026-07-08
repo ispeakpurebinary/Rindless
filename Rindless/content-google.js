@@ -1,5 +1,5 @@
 // Rindless — Google AI Overview / People Also Ask
-// CSS-first. Avoid repeated full-DOM walks — those tank search page performance.
+// CSS-first where possible; PAA need a light JS find (heading text is the stable signal).
 
 const DEFAULT_SETTINGS = {
   hideAI: true,
@@ -32,10 +32,15 @@ const AI_HIDE_LIST = [
   "#abc_summary",
 ];
 
-const AI_HIDE_CSS = `
+/** Top AI Overview only — used when PAA section is left visible */
+function buildAiHideCss(allowPaaAiAnswers) {
+  let css = `
   ${AI_HIDE_LIST.join(",\n  ")} {
     display: none !important;
   }
+`;
+  if (allowPaaAiAnswers) {
+    css += `
   ${AI_HIDE_LIST.map(
     (sel) =>
       `[data-initq] ${sel},\n  [data-q] ${sel},\n  .related-question-pair ${sel}`
@@ -43,10 +48,14 @@ const AI_HIDE_CSS = `
     display: revert !important;
   }
 `;
+  }
+  return css;
+}
 
 const PAA_HIDE_CSS = `
   .related-question-pair,
-  [data-initq] {
+  [data-initq],
+  div[jsname="Cpkphb"] {
     display: none !important;
   }
 `;
@@ -75,7 +84,11 @@ function setStyle(id, css) {
 }
 
 function applyStyles() {
-  setStyle("rindless-ai-hide", currentSettings.hideAI ? AI_HIDE_CSS : "");
+  const allowPaaAi = currentSettings.hideAI && !currentSettings.hidePeopleAlsoAsk;
+  setStyle(
+    "rindless-ai-hide",
+    currentSettings.hideAI ? buildAiHideCss(allowPaaAi) : ""
+  );
   setStyle(
     "rindless-paa-hide",
     currentSettings.hidePeopleAlsoAsk ? PAA_HIDE_CSS : ""
@@ -84,6 +97,86 @@ function applyStyles() {
 
 function anyFeatureOn() {
   return currentSettings.hideAI || currentSettings.hidePeopleAlsoAsk;
+}
+
+function clearPaaInlineHides() {
+  document.querySelectorAll("[data-rindless-paa-hidden]").forEach((el) => {
+    delete el.dataset.rindlessPaaHidden;
+    el.style.removeProperty("display");
+    el.style.removeProperty("visibility");
+    el.style.removeProperty("height");
+    el.style.removeProperty("overflow");
+    el.style.removeProperty("margin");
+    el.style.removeProperty("padding");
+  });
+}
+
+function hideNode(el) {
+  if (!el || el.dataset.rindlessPaaHidden) {
+    return;
+  }
+  el.dataset.rindlessPaaHidden = "true";
+  el.style.setProperty("display", "none", "important");
+  el.style.setProperty("visibility", "hidden", "important");
+  el.style.setProperty("height", "0", "important");
+  el.style.setProperty("overflow", "hidden", "important");
+  el.style.setProperty("margin", "0", "important");
+  el.style.setProperty("padding", "0", "important");
+}
+
+/**
+ * Find the outer People Also Ask block via the stable "People also ask" heading,
+ * then hide that whole result card (not just inner rows).
+ */
+function hidePeopleAlsoAskSections() {
+  if (!currentSettings.hidePeopleAlsoAsk) {
+    return;
+  }
+
+  const roots = document.querySelectorAll(
+    "#rso > div, #rso div.MjjYud, #rso div.ULSxyf, #center_col div.MjjYud, #center_col div.ULSxyf"
+  );
+
+  roots.forEach((block) => {
+    if (block.dataset.rindlessPaaHidden) {
+      return;
+    }
+    // Only check a thin slice of text — full textContent of huge trees is expensive
+    const probe = block.querySelector("h2, [role='heading'], span");
+    const headingText = (probe?.textContent || "").trim().toLowerCase();
+    if (
+      headingText === "people also ask" ||
+      headingText === "people also search for"
+    ) {
+      hideNode(block);
+      return;
+    }
+    if (
+      block.querySelector(
+        ".related-question-pair, [data-initq], [jsname='Cpkphb']"
+      )
+    ) {
+      // Prefer the outermost result card in #rso
+      const card =
+        block.closest("#rso > div") ||
+        block.closest("div.MjjYud, div.ULSxyf") ||
+        block;
+      hideNode(card);
+    }
+  });
+
+  // Heading-first fallback if Google wraps PAA differently
+  document.querySelectorAll("h2, [role='heading']").forEach((heading) => {
+    const text = (heading.textContent || "").trim().toLowerCase();
+    if (text !== "people also ask" && text !== "people also search for") {
+      return;
+    }
+    const card =
+      heading.closest("#rso > div") ||
+      heading.closest("div.MjjYud, div.ULSxyf") ||
+      heading.parentElement?.parentElement;
+    hideNode(card);
+  });
 }
 
 function stopObserver() {
@@ -100,14 +193,18 @@ function clearTimedPasses() {
   timedPassTimers = [];
 }
 
-/** Cheap pass: styles only. Google injects AI late — CSS still catches nodes. */
-function runStylePass() {
+function runHidePass() {
   applyStyles();
+  if (currentSettings.hidePeopleAlsoAsk) {
+    hidePeopleAlsoAskSections();
+  } else {
+    clearPaaInlineHides();
+  }
 }
 
-function scheduleStylePass() {
+function scheduleHidePass() {
   clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(runStylePass, 500);
+  debounceTimer = setTimeout(runHidePass, 400);
 }
 
 function startObserver() {
@@ -116,23 +213,24 @@ function startObserver() {
     return;
   }
 
-  runStylePass();
+  runHidePass();
 
-  const root = document.querySelector("#center_col") || document.querySelector("#rcnt");
+  const root =
+    document.querySelector("#rso") ||
+    document.querySelector("#center_col") ||
+    document.querySelector("#rcnt");
   if (!root) {
-    // Body not ready yet — retry once
     timedPassTimers.push(setTimeout(startObserver, 400));
     return;
   }
 
   observer = new MutationObserver(() => {
-    // Don't re-query the whole document — styles already hide matching nodes.
-    // Only ensure our <style> tags still exist after SPA swaps.
-    scheduleStylePass();
+    scheduleHidePass();
   });
-  observer.observe(root, { childList: true, subtree: false });
+  // childList on #rso is enough — PAA is injected as a sibling result block
+  observer.observe(root, { childList: true, subtree: true });
 
-  observerTimer = setTimeout(stopObserver, 8000);
+  observerTimer = setTimeout(stopObserver, 10000);
 }
 
 function watchNavigation() {
@@ -151,9 +249,10 @@ function watchNavigation() {
       return;
     }
     clearTimedPasses();
+    clearPaaInlineHides();
     startObserver();
-    timedPassTimers.push(setTimeout(runStylePass, 800));
-    timedPassTimers.push(setTimeout(runStylePass, 2500));
+    timedPassTimers.push(setTimeout(runHidePass, 800));
+    timedPassTimers.push(setTimeout(runHidePass, 2500));
   };
 
   window.addEventListener("popstate", onNavigate);
@@ -172,9 +271,10 @@ function applyFeatureState() {
     return;
   }
 
-  applyStyles();
-
   if (!anyFeatureOn()) {
+    setStyle("rindless-ai-hide", "");
+    setStyle("rindless-paa-hide", "");
+    clearPaaInlineHides();
     stopObserver();
     clearTimedPasses();
     return;
@@ -183,11 +283,11 @@ function applyFeatureState() {
   startObserver();
   watchNavigation();
   clearTimedPasses();
-  timedPassTimers.push(setTimeout(runStylePass, 800));
-  timedPassTimers.push(setTimeout(runStylePass, 2500));
+  timedPassTimers.push(setTimeout(runHidePass, 800));
+  timedPassTimers.push(setTimeout(runHidePass, 2500));
 }
 
-if (isGoogleSearchPage()) {
+if (isGoogleSearchPage() && DEFAULT_SETTINGS.hidePeopleAlsoAsk) {
   try {
     applyStyles();
   } catch (_err) {
