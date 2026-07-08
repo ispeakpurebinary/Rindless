@@ -12,21 +12,17 @@ Each feature can be turned on or off from the pop-up. Settings sync across Chrom
 
 ### 1. Hide AI Results 
 
-On Google Search, injects CSS and watches the page for AI Overview blocks as they load. Hides the summary so you see normal search results instead. Works on Google country domains and updates when you search without reloading the page.
+On Google Search, it injects CSS and watches the page for AI Overview blocks as they load. Hides the summary so you see normal search results instead. Works on Google country domains and updates when you search without reloading the page.
 
-<<<<<<< HEAD
-### 2. Reject Cookies
-=======
-### Hide People Also Ask
+### 2. Hide "People Also Ask" Section
 
-Optional. Google’s “People also ask” section often embeds AI Overviews as answers. Leave this off to keep PAA visible; turn it on to hide the whole section.
+Google now injects AI Overview as the sole answer in People Also Ask results and has removed most older non-AI answers, so Rindless cannot restore them :( If you don't want to see AI-backed answers, you can hide the whole section with this toggle.
 
-### Reject Cookies
->>>>>>> 1b98267 (fixed slow loading)
+### 3. Reject Cookies
 
 On sites you visit, it looks for common cookie banner “Reject” / “Decline” buttons and clicks them automatically. If no known button is found, it scores visible buttons by text and clicks the best match. Runs for a few seconds after page load to catch late banners.
 
-### 3. Ad Blocker
+### 4. Ad Blocker
 
 Blocks network requests to known ad and tracker domains using bundled rules. **Reload the page** after toggling this on or off for network blocking to apply.
 
