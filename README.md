@@ -14,7 +14,15 @@ Each feature can be turned on or off from the pop-up. Settings sync across Chrom
 
 On Google Search, injects CSS and watches the page for AI Overview blocks as they load. Hides the summary so you see normal search results instead. Works on Google country domains and updates when you search without reloading the page.
 
+<<<<<<< HEAD
 ### 2. Reject Cookies
+=======
+### Hide People Also Ask
+
+Optional. Google’s “People also ask” section often embeds AI Overviews as answers. Leave this off to keep PAA visible; turn it on to hide the whole section.
+
+### Reject Cookies
+>>>>>>> 1b98267 (fixed slow loading)
 
 On sites you visit, it looks for common cookie banner “Reject” / “Decline” buttons and clicks them automatically. If no known button is found, it scores visible buttons by text and clicks the best match. Runs for a few seconds after page load to catch late banners.
 

@@ -1,4 +1,5 @@
-// Rindless — YouTube cosmetic ad blocking (pairs with DNR rules)
+// Rindless — YouTube cosmetic ads (lightweight)
+// Prefer CSS. Only wake JS when the player enters an ad state.
 
 const DEFAULT_SETTINGS = { adblock: true };
 
@@ -22,136 +23,114 @@ const YOUTUBE_AD_CSS = `
   }
 `;
 
-const YOUTUBE_SKIP_SELECTORS = [
+const SKIP_SELECTORS = [
   ".ytp-ad-skip-button-modern",
   ".ytp-skip-ad-button",
   ".ytp-ad-skip-button",
-  ".ytp-ad-skip-button-slot",
 ];
 
-let ytStylesInjected = false;
-let ytDebounceTimer = null;
-let ytPlayerObserver = null;
-let ytNavHooked = false;
+let stylesInjected = false;
+let playerObserver = null;
+let adTickTimer = null;
+let navHooked = false;
 
-function isYouTubePage() {
-  return window === window.top && /(^|\.)youtube\.com$/.test(location.hostname);
-}
-
-function isVisible(element) {
-  if (!element || element.offsetParent === null) {
-    return false;
-  }
-  const style = window.getComputedStyle(element);
-  return style.visibility !== "hidden" && style.display !== "none" && style.opacity !== "0";
-}
-
-function injectYouTubeAdStyles() {
-  if (ytStylesInjected || document.getElementById("rindless-yt-ads")) {
-    ytStylesInjected = true;
+function injectStyles() {
+  if (stylesInjected || document.getElementById("rindless-yt-ads")) {
+    stylesInjected = true;
     return;
   }
   const style = document.createElement("style");
   style.id = "rindless-yt-ads";
   style.textContent = YOUTUBE_AD_CSS;
   (document.head || document.documentElement)?.appendChild(style);
-  ytStylesInjected = true;
+  stylesInjected = true;
 }
 
 function removeYouTubeAdblock() {
   document.getElementById("rindless-yt-ads")?.remove();
-  ytStylesInjected = false;
-  ytPlayerObserver?.disconnect();
-  ytPlayerObserver = null;
+  stylesInjected = false;
+  playerObserver?.disconnect();
+  playerObserver = null;
+  clearInterval(adTickTimer);
+  adTickTimer = null;
 }
 
-function clickYouTubeSkipAd() {
-  for (const selector of YOUTUBE_SKIP_SELECTORS) {
+function handleActiveAd() {
+  const player = document.querySelector("#movie_player");
+  if (!player?.classList.contains("ad-showing")) {
+    clearInterval(adTickTimer);
+    adTickTimer = null;
+    return;
+  }
+
+  for (const selector of SKIP_SELECTORS) {
     const button = document.querySelector(selector);
-    if (button && isVisible(button)) {
+    if (button) {
       button.click();
-      return true;
+      return;
     }
   }
-  return false;
-}
 
-function speedThroughYouTubeAd() {
-  const player = document.querySelector("#movie_player, .html5-video-player");
-  if (!player?.classList.contains("ad-showing")) {
-    return;
-  }
   const video = player.querySelector("video");
-  if (!video) {
+  if (video) {
+    if (video.playbackRate < 16) {
+      video.playbackRate = 16;
+    }
+    video.muted = true;
+  }
+}
+
+function onPlayerClassChange() {
+  const player = document.querySelector("#movie_player");
+  if (!player?.classList.contains("ad-showing")) {
+    clearInterval(adTickTimer);
+    adTickTimer = null;
     return;
   }
-  if (video.playbackRate < 16) {
-    video.playbackRate = 16;
+  handleActiveAd();
+  if (!adTickTimer) {
+    // Poll gently only while an ad is showing
+    adTickTimer = setInterval(handleActiveAd, 700);
   }
-  video.muted = true;
 }
 
-function runYouTubeAdPass() {
-  injectYouTubeAdStyles();
-  clickYouTubeSkipAd();
-  speedThroughYouTubeAd();
-}
-
-function scheduleYouTubeAdPass() {
-  clearTimeout(ytDebounceTimer);
-  ytDebounceTimer = setTimeout(runYouTubeAdPass, 400);
-}
-
-function watchYouTubePlayer() {
-  ytPlayerObserver?.disconnect();
+function watchPlayer() {
+  playerObserver?.disconnect();
   const player = document.querySelector("#movie_player");
   if (!player) {
     return;
   }
-  runYouTubeAdPass();
-  ytPlayerObserver = new MutationObserver((mutations) => {
-    const hasNewNodes = mutations.some((m) =>
-      [...m.addedNodes].some((n) => n.nodeType === Node.ELEMENT_NODE)
-    );
-    if (hasNewNodes || player.classList.contains("ad-showing")) {
-      scheduleYouTubeAdPass();
-    }
-  });
-  ytPlayerObserver.observe(player, {
+
+  playerObserver = new MutationObserver(onPlayerClassChange);
+  // Class only — not subtree. Subtree watching is what made YouTube laggy.
+  playerObserver.observe(player, {
     attributes: true,
     attributeFilter: ["class"],
-    childList: true,
-    subtree: true,
   });
+  onPlayerClassChange();
 }
 
-function hookYouTubeNavigation() {
-  if (ytNavHooked) {
+function hookNavigation() {
+  if (navHooked) {
     return;
   }
-  ytNavHooked = true;
+  navHooked = true;
   document.addEventListener("yt-navigate-finish", () => {
-    injectYouTubeAdStyles();
-    watchYouTubePlayer();
-    setTimeout(runYouTubeAdPass, 500);
-    setTimeout(runYouTubeAdPass, 2000);
+    injectStyles();
+    setTimeout(watchPlayer, 300);
   });
 }
 
 function initYouTubeAdblock() {
-  if (!isYouTubePage()) {
-    return;
-  }
-  injectYouTubeAdStyles();
-  watchYouTubePlayer();
-  hookYouTubeNavigation();
-  setTimeout(runYouTubeAdPass, 1000);
-  setTimeout(watchYouTubePlayer, 2000);
+  injectStyles();
+  watchPlayer();
+  hookNavigation();
+  // One delayed attach if player wasn't ready yet
+  setTimeout(watchPlayer, 1500);
 }
 
 chrome.storage.sync.get(DEFAULT_SETTINGS, (settings) => {
   if (chrome.runtime.lastError) {
-    console.error("[Rindless] storage read error:", chrome.runtime.lastError);
     return;
   }
   if (settings.adblock) {
@@ -160,17 +139,11 @@ chrome.storage.sync.get(DEFAULT_SETTINGS, (settings) => {
     } catch (err) {
       console.error("[Rindless] youtube adblock error:", err);
     }
-  } else {
-    try {
-      removeYouTubeAdblock();
-    } catch (err) {
-      console.error("[Rindless] youtube adblock disable error:", err);
-    }
   }
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== "sync" || !changes.adblock || !isYouTubePage()) {
+  if (area !== "sync" || !changes.adblock) {
     return;
   }
   try {

@@ -2,6 +2,7 @@
 
 const DEFAULT_SETTINGS = {
   hideAI: true,
+  hidePeopleAlsoAsk: false,
   rejectCookies: true,
   adblock: true,
 };

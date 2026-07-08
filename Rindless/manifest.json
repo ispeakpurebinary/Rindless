@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Rindless",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Hide Google AI results, auto-reject cookie banners, and block ads and trackers.",
   "permissions": ["storage", "declarativeNetRequest"],
   "background": {

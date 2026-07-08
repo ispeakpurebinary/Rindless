@@ -1,6 +1,10 @@
-// Rindless — Hide Google AI Overview (Google domains only)
+// Rindless — Google AI Overview / People Also Ask
+// CSS-first. Avoid repeated full-DOM walks — those tank search page performance.
 
-const DEFAULT_SETTINGS = { hideAI: true };
+const DEFAULT_SETTINGS = {
+  hideAI: true,
+  hidePeopleAlsoAsk: false,
+};
 
 function isGoogleSearchPage() {
   if (window !== window.top) {
@@ -15,126 +19,143 @@ function isGoogleSearchPage() {
   return isGoogleHost && location.pathname.startsWith("/search");
 }
 
+const AI_HIDE_LIST = [
+  'div[aria-label="AI Overview"]',
+  'div[data-attrid="AIOverview"]',
+  'div[data-async-type="aiOverview"]',
+  'div[data-async-context*="ai_overview"]',
+  'div[data-rl="ai_overview"]',
+  "div#eKIzJc",
+  "div.YzCcne[data-mcpr]",
+  'div[data-mcp="18"]',
+  ".AIOverview",
+  "#abc_summary",
+];
+
 const AI_HIDE_CSS = `
-  div[aria-label="AI Overview"],
-  div[data-attrid="AIOverview"],
-  div[data-attrid="overview"],
-  div[data-async-type="aiOverview"],
-  div[data-async-context*="ai_overview"],
-  div[data-rl="ai_overview"],
-  div#eKIzJc,
-  div.YzCcne[data-mcpr],
-  div[data-mcp="18"],
-  div[jsname="yEVEwb"],
-  div[jsname="tJHJj"],
-  div[jsname="N760b"],
-  .AIOverview,
-  #abc_summary,
-  #m-x-content,
-  #rso div.ULSxyf:has(a[href*="ai_overviews"]),
-  #rso > div.MjjYud:has(a[href*="ai_overviews"]),
-  #rcnt div[data-hveid] div:has(a[href*="ai_overviews"]),
-  #rcnt div[data-hveid] div:has([data-async-type="folsrch"]) {
+  ${AI_HIDE_LIST.join(",\n  ")} {
     display: none !important;
-    visibility: hidden !important;
-    height: 0 !important;
-    overflow: hidden !important;
-    margin: 0 !important;
-    padding: 0 !important;
+  }
+  ${AI_HIDE_LIST.map(
+    (sel) =>
+      `[data-initq] ${sel},\n  [data-q] ${sel},\n  .related-question-pair ${sel}`
+  ).join(",\n  ")} {
+    display: revert !important;
   }
 `;
 
-let aiStylesInjected = false;
-let aiDebounceTimer = null;
-let aiObserver = null;
-let aiObserverDisconnectTimer = null;
-let aiNavHooked = false;
+const PAA_HIDE_CSS = `
+  .related-question-pair,
+  [data-initq] {
+    display: none !important;
+  }
+`;
 
-function injectAIHideStyles() {
-  if (aiStylesInjected || document.getElementById("rindless-ai-hide")) {
-    aiStylesInjected = true;
+let currentSettings = { ...DEFAULT_SETTINGS };
+let navHooked = false;
+let observer = null;
+let observerTimer = null;
+let debounceTimer = null;
+let timedPassTimers = [];
+
+function setStyle(id, css) {
+  let style = document.getElementById(id);
+  if (!css) {
+    style?.remove();
     return;
   }
-  const style = document.createElement("style");
-  style.id = "rindless-ai-hide";
-  style.textContent = AI_HIDE_CSS;
-  (document.head || document.documentElement)?.appendChild(style);
-  aiStylesInjected = true;
-}
-
-function removeAIHideStyles() {
-  document.getElementById("rindless-ai-hide")?.remove();
-  aiStylesInjected = false;
-}
-
-function hideAIOverviewFallback() {
-  document.querySelectorAll("h1, h2, h3").forEach((heading) => {
-    const text = heading.textContent?.trim();
-    if (text !== "AI Overview" && !text?.startsWith("AI Overview")) {
-      return;
-    }
-    const container = heading.closest(
-      "div[data-mcpr], div.YzCcne, div#eKIzJc, div.MjjYud, div.ULSxyf"
-    );
-    if (container) {
-      container.style.setProperty("display", "none", "important");
-    }
-  });
-}
-
-function runAIHidePass() {
-  injectAIHideStyles();
-  hideAIOverviewFallback();
-}
-
-function scheduleAIHidePass() {
-  clearTimeout(aiDebounceTimer);
-  aiDebounceTimer = setTimeout(runAIHidePass, 300);
-}
-
-function getAISearchRoot() {
-  return document.querySelector("#rcnt") || document.querySelector("#center_col") || document.body;
-}
-
-function startAIHideObserver() {
-  if (aiObserver) {
-    aiObserver.disconnect();
-    clearTimeout(aiObserverDisconnectTimer);
+  if (!style) {
+    style = document.createElement("style");
+    style.id = id;
+    (document.head || document.documentElement)?.appendChild(style);
   }
-  runAIHidePass();
-  aiObserver = new MutationObserver((mutations) => {
-    const hasNewNodes = mutations.some((m) =>
-      [...m.addedNodes].some((n) => n.nodeType === Node.ELEMENT_NODE)
-    );
-    if (hasNewNodes) {
-      scheduleAIHidePass();
-    }
-  });
-  const root = getAISearchRoot();
-  if (root) {
-    aiObserver.observe(root, { childList: true, subtree: true });
+  if (style.textContent !== css) {
+    style.textContent = css;
   }
-  aiObserverDisconnectTimer = setTimeout(() => {
-    aiObserver?.disconnect();
-    aiObserver = null;
-  }, 10000);
 }
 
-function watchGoogleSearchNavigation() {
-  if (aiNavHooked) {
+function applyStyles() {
+  setStyle("rindless-ai-hide", currentSettings.hideAI ? AI_HIDE_CSS : "");
+  setStyle(
+    "rindless-paa-hide",
+    currentSettings.hidePeopleAlsoAsk ? PAA_HIDE_CSS : ""
+  );
+}
+
+function anyFeatureOn() {
+  return currentSettings.hideAI || currentSettings.hidePeopleAlsoAsk;
+}
+
+function stopObserver() {
+  observer?.disconnect();
+  observer = null;
+  clearTimeout(observerTimer);
+  observerTimer = null;
+  clearTimeout(debounceTimer);
+  debounceTimer = null;
+}
+
+function clearTimedPasses() {
+  timedPassTimers.forEach(clearTimeout);
+  timedPassTimers = [];
+}
+
+/** Cheap pass: styles only. Google injects AI late — CSS still catches nodes. */
+function runStylePass() {
+  applyStyles();
+}
+
+function scheduleStylePass() {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(runStylePass, 500);
+}
+
+function startObserver() {
+  stopObserver();
+  if (!anyFeatureOn()) {
     return;
   }
-  aiNavHooked = true;
+
+  runStylePass();
+
+  const root = document.querySelector("#center_col") || document.querySelector("#rcnt");
+  if (!root) {
+    // Body not ready yet — retry once
+    timedPassTimers.push(setTimeout(startObserver, 400));
+    return;
+  }
+
+  observer = new MutationObserver(() => {
+    // Don't re-query the whole document — styles already hide matching nodes.
+    // Only ensure our <style> tags still exist after SPA swaps.
+    scheduleStylePass();
+  });
+  observer.observe(root, { childList: true, subtree: false });
+
+  observerTimer = setTimeout(stopObserver, 8000);
+}
+
+function watchNavigation() {
+  if (navHooked) {
+    return;
+  }
+  navHooked = true;
+
   let lastUrl = location.href;
   const onNavigate = () => {
-    if (location.href !== lastUrl && isGoogleSearchPage()) {
-      lastUrl = location.href;
-      injectAIHideStyles();
-      startAIHideObserver();
-      setTimeout(runAIHidePass, 1000);
-      setTimeout(runAIHidePass, 3000);
+    if (location.href === lastUrl || !isGoogleSearchPage()) {
+      return;
     }
+    lastUrl = location.href;
+    if (!anyFeatureOn()) {
+      return;
+    }
+    clearTimedPasses();
+    startObserver();
+    timedPassTimers.push(setTimeout(runStylePass, 800));
+    timedPassTimers.push(setTimeout(runStylePass, 2500));
   };
+
   window.addEventListener("popstate", onNavigate);
   for (const method of ["pushState", "replaceState"]) {
     const original = history[method];
@@ -146,43 +167,67 @@ function watchGoogleSearchNavigation() {
   }
 }
 
-function initHideGoogleAI() {
+function applyFeatureState() {
   if (!isGoogleSearchPage()) {
     return;
   }
-  injectAIHideStyles();
-  runAIHidePass();
-  startAIHideObserver();
-  watchGoogleSearchNavigation();
-  setTimeout(runAIHidePass, 1000);
-  setTimeout(runAIHidePass, 3000);
-  setTimeout(runAIHidePass, 6000);
+
+  applyStyles();
+
+  if (!anyFeatureOn()) {
+    stopObserver();
+    clearTimedPasses();
+    return;
+  }
+
+  startObserver();
+  watchNavigation();
+  clearTimedPasses();
+  timedPassTimers.push(setTimeout(runStylePass, 800));
+  timedPassTimers.push(setTimeout(runStylePass, 2500));
 }
 
 if (isGoogleSearchPage()) {
   try {
-    injectAIHideStyles();
+    applyStyles();
   } catch (_err) {
-    // full init runs after storage resolves
+    // storage init below
   }
 }
 
 chrome.storage.sync.get(DEFAULT_SETTINGS, (settings) => {
   if (chrome.runtime.lastError) {
-    console.error("[Rindless] storage read error:", chrome.runtime.lastError);
     return;
   }
-  if (settings.hideAI) {
+  currentSettings = {
+    hideAI: Boolean(settings.hideAI),
+    hidePeopleAlsoAsk: Boolean(settings.hidePeopleAlsoAsk),
+  };
+  try {
+    applyFeatureState();
+  } catch (err) {
+    console.error("[Rindless] google features error:", err);
+  }
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "sync" || !isGoogleSearchPage()) {
+    return;
+  }
+  let changed = false;
+  if (changes.hideAI) {
+    currentSettings.hideAI = Boolean(changes.hideAI.newValue);
+    changed = true;
+  }
+  if (changes.hidePeopleAlsoAsk) {
+    currentSettings.hidePeopleAlsoAsk = Boolean(changes.hidePeopleAlsoAsk.newValue);
+    changed = true;
+  }
+  if (changed) {
     try {
-      initHideGoogleAI();
+      applyFeatureState();
     } catch (err) {
-      console.error("[Rindless] hideAI error:", err);
-    }
-  } else {
-    try {
-      removeAIHideStyles();
-    } catch (err) {
-      console.error("[Rindless] hideAI disable error:", err);
+      console.error("[Rindless] google features storage change error:", err);
     }
   }
 });

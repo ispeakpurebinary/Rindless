@@ -2,11 +2,13 @@
 
 const DEFAULT_SETTINGS = {
   hideAI: true,
+  hidePeopleAlsoAsk: false,
   rejectCookies: true,
   adblock: true,
 };
 
 const hideAIInput = document.getElementById("hideAI");
+const hidePeopleAlsoAskInput = document.getElementById("hidePeopleAlsoAsk");
 const rejectCookiesInput = document.getElementById("rejectCookies");
 const adblockInput = document.getElementById("adblock");
 const togglesContainer = document.getElementById("toggles");
@@ -14,6 +16,11 @@ const togglesContainer = document.getElementById("toggles");
 /** Map storage keys to checkbox elements and header health bars */
 const TOGGLE_MAP = [
   { key: "hideAI", input: hideAIInput, health: document.getElementById("health-hideAI") },
+  {
+    key: "hidePeopleAlsoAsk",
+    input: hidePeopleAlsoAskInput,
+    health: document.getElementById("health-hidePeopleAlsoAsk"),
+  },
   { key: "rejectCookies", input: rejectCookiesInput, health: document.getElementById("health-rejectCookies") },
   { key: "adblock", input: adblockInput, health: document.getElementById("health-adblock") },
 ];
