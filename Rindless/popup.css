@@ -40,8 +40,8 @@
     0px calc(100% - 8px)
   );
 
-  --pink-header: #f48fb1;
-  --pink-label: #880e4f;
+  --pink-header: #ce6688;
+  --pink-label: #b0246f;
   --pink-muted: #b06080;
   --green-on: #4caf50;
   --green-bar: #66bb6a;
@@ -320,20 +320,22 @@ body.loading .toggle-row-wrap {
 
 .info-button:hover,
 .info-button:focus-visible {
-  background: #a71763;
+  background: #6b0039;
   outline: none;
 }
 
 .info-panel {
   margin-top: 7px;
-  padding: 7px 8px;
+  width: calc(100% + 10px);
+  margin-right: -10px;
+  padding: 7px 10px;
   background: #ffe3ef;
   clip-path: var(--pixel-clip);
   box-shadow: 2px 2px 0 var(--ink);
 }
 
 .info-panel-text {
-  font-size: 6px;
+  font-size: 7px;
   line-height: 1.7;
   color: var(--pink-label);
 }
